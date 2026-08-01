@@ -1,0 +1,41 @@
+name: Deploy FastAPI Service
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - name: Deploy
+        uses: appleboy/ssh-action@v1.0.3
+
+        with:
+
+          host: ${{ secrets.AWS_HOST }}
+          username: ${{ secrets.AWS_USERNAME }}
+          key: ${{ secrets.AWS_PRIVATE_KEY }}
+
+          script: |
+
+            cd ${{ secrets.APP_PATH }}
+
+            echo "Current Directory"
+            pwd
+
+            git pull origin main
+
+            source chatbot-venv/bin/activate
+
+            pip install -r requirements.txt
+
+            pm2 restart ${{ secrets.PM2_SERVICE_NAME }}
+
+            pm2 save
+
+            echo "Deployment Successful."
