@@ -1,0 +1,804 @@
+<!-- ==================== AI CHATBOT WIDGET ====================
+     Include this snippet at the bottom of ANY HTML page
+     Usage: Add this before closing </body> tag
+     ========================================================== -->
+
+<style>
+    /* Chatbot Container */
+    #chakorabot-container {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 9999;
+        font-family: 'Segoe UI', Tahoma, sans-serif;
+    }
+
+    /* Chat Button */
+    #chakorabot-button {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+        position: relative;
+    }
+
+    #chakorabot-button:hover {
+        transform: scale(1.1);
+        box-shadow: 0 6px 30px rgba(102, 126, 234, 0.6);
+    }
+
+    #chakorabot-button svg {
+        width: 30px;
+        height: 30px;
+        fill: white;
+    }
+
+    /* Notification Badge */
+    #chakorabot-badge {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        background: #ef4444;
+        color: white;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        font-size: 12px;
+        font-weight: bold;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+    }
+
+    /* Chat Window */
+    #chakorabot-window {
+        position: absolute;
+        bottom: 85px;
+        right: 0;
+        width: 460px;
+        height: 640px;
+        max-width: calc(100vw - 40px);
+        max-height: calc(100vh - 110px);
+        background: white;
+        border-radius: 24px;
+        box-shadow: 0 12px 48px rgba(0, 0, 0, 0.22);
+        display: none;
+        flex-direction: column;
+        overflow: hidden;
+        animation: slideUp 0.3s ease;
+    }
+
+
+    #chakorabot-window.open {
+        display: flex;
+    }
+
+    @keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Chat Header */
+    #chakorabot-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    #chakorabot-header-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    #chakorabot-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+    }
+
+    #chakorabot-title {
+        font-weight: 700;
+        font-size: 1.1rem;
+    }
+
+    #chakorabot-status {
+        font-size: 0.8rem;
+        opacity: 0.9;
+    }
+
+    #chakorabot-close {
+        background: rgba(255, 255, 255, 0.2);
+        border: none;
+        color: white;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+    }
+
+    #chakorabot-close:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: rotate(90deg);
+    }
+
+    /* Chat Messages */
+    #chakorabot-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        background: #f8f9fa;
+    }
+
+    .chakorabot-message {
+        margin-bottom: 15px;
+        display: flex;
+        gap: 10px;
+        animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .chakorabot-message.user {
+        flex-direction: row-reverse;
+    }
+
+    .chakorabot-message-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 14px;
+        flex-shrink: 0;
+    }
+
+    .chakorabot-message.user .chakorabot-message-avatar {
+        background: #e5e7eb;
+        color: #333;
+    }
+
+    .chakorabot-message-content {
+        max-width: 85%;
+        padding: 14px 18px;
+        border-radius: 18px;
+        background: white;
+        box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
+        word-wrap: break-word;
+        white-space: pre-wrap;
+        font-size: 0.96rem;
+        line-height: 1.5;
+    }
+
+
+    .chakorabot-message.user .chakorabot-message-content {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .chakorabot-message-time {
+        font-size: 0.75rem;
+        color: #9ca3af;
+        margin-top: 5px;
+    }
+
+    /* Typing Indicator */
+    .chakorabot-typing {
+        display: none;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 16px;
+        background: white;
+        border-radius: 15px;
+        width: fit-content;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .chakorabot-typing.show {
+        display: flex;
+    }
+
+    .chakorabot-typing-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #667eea;
+        animation: typing 1.4s infinite;
+    }
+
+    .chakorabot-typing-dot:nth-child(2) {
+        animation-delay: 0.2s;
+    }
+
+    .chakorabot-typing-dot:nth-child(3) {
+        animation-delay: 0.4s;
+    }
+
+    @keyframes typing {
+        0%, 60%, 100% { transform: translateY(0); }
+        30% { transform: translateY(-10px); }
+    }
+
+    /* Chat Input */
+    #chakorabot-input-container {
+        padding: 15px;
+        background: white;
+        border-top: 1px solid #e5e7eb;
+        display: flex;
+        gap: 10px;
+    }
+
+    #chakorabot-input {
+        flex: 1;
+        border: 2px solid #e5e7eb;
+        border-radius: 25px;
+        padding: 12px 20px;
+        font-size: 0.95rem;
+        outline: none;
+        transition: all 0.3s ease;
+    }
+
+    #chakorabot-input:focus {
+        border-color: #667eea;
+    }
+
+    #chakorabot-send {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        color: white;
+        width: 45px;
+        height: 45px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+        flex-shrink: 0;
+    }
+
+    #chakorabot-send:hover {
+        transform: scale(1.1);
+    }
+
+    #chakorabot-send:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    /* Quick Actions */
+    #chakorabot-quick-actions {
+        display: flex;
+        gap: 8px;
+        padding: 0 20px 10px;
+        flex-wrap: wrap;
+    }
+
+    .chakorabot-quick-action {
+        background: white;
+        border: 2px solid #e5e7eb;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .chakorabot-quick-action:hover {
+        background: #667eea;
+        color: white;
+        border-color: #667eea;
+    }
+
+    /* Scrollbar */
+    #chakorabot-messages::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    #chakorabot-messages::-webkit-scrollbar-thumb {
+        background: #d1d5db;
+        border-radius: 10px;
+    }
+
+    #chakorabot-messages::-webkit-scrollbar-thumb:hover {
+        background: #9ca3af;
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 480px) {
+        #chakorabot-window {
+            width: calc(100vw - 40px);
+            height: calc(100vh - 100px);
+        }
+    }
+</style>
+
+<!-- Chatbot HTML -->
+<div id="chakorabot-container">
+    <!-- Floating Button -->
+    <button id="chakorabot-button" onclick="toggleChatbot()">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M12 2C6.48 2 2 6.48 2 12c0 1.54.36 3 .97 4.29L2 22l5.71-.97C9 21.64 10.46 22 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm0 18c-1.38 0-2.68-.31-3.85-.86l-.27-.14-2.83.48.48-2.83-.14-.27C4.31 14.68 4 13.38 4 12c0-4.41 3.59-8 8-8s8 3.59 8 8-3.59 8-8 8z"/>
+            <circle cx="9" cy="12" r="1"/>
+            <circle cx="12" cy="12" r="1"/>
+            <circle cx="15" cy="12" r="1"/>
+        </svg>
+        <div id="chakorabot-badge">1</div>
+    </button>
+
+    <!-- Chat Window -->
+    <div id="chakorabot-window">
+        <!-- Header -->
+        <div id="chakorabot-header">
+            <div id="chakorabot-header-left">
+                <div id="chakorabot-avatar">🤖</div>
+                <div>
+                    <div id="chakorabot-title">ChakoraBot</div>
+                    <div id="chakorabot-status">Online</div>
+                </div>
+            </div>
+            <button id="chakorabot-close" onclick="toggleChatbot()">✕</button>
+        </div>
+
+        <!-- Messages Area -->
+        <div id="chakorabot-messages">
+            <!-- Welcome Message -->
+            <div class="chakorabot-message">
+                <div class="chakorabot-message-avatar">🤖</div>
+                <div>
+                    <div class="chakorabot-message-content">
+                        👋 Hello! I'm ChakoraBot, your AI assistant. How can I help you today?
+                    </div>
+                    <div class="chakorabot-message-time" id="welcome-time"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div id="chakorabot-quick-actions">
+            <div class="chakorabot-quick-action" onclick="sendQuickMessage('What courses do you offer?')">
+                📚 Courses
+            </div>
+            <div class="chakorabot-quick-action" onclick="sendQuickMessage('How do I register?')">
+                ✍️ Register
+            </div>
+            <div class="chakorabot-quick-action" onclick="sendQuickMessage('Tell me about internships')">
+                💼 Internships
+            </div>
+            <div class="chakorabot-quick-action" onclick="requestLiveSupport()" style="background:#e0e7ff; border-color:#818cf8; color:#3730a3; font-weight:600;">
+                🎧 Talk to Support Agent
+            </div>
+        </div>
+
+        <!-- Typing Indicator -->
+        <div class="chakorabot-typing" id="chakorabot-typing">
+            <span id="typing-text-label" style="font-size:0.85rem; color:#4b5563; font-weight:600; font-style:italic;">🤖 Chakora is typing...</span>
+            <div class="chakorabot-typing-dot"></div>
+            <div class="chakorabot-typing-dot"></div>
+            <div class="chakorabot-typing-dot"></div>
+        </div>
+
+
+        <!-- Input Area -->
+        <div id="chakorabot-input-container">
+            <input 
+                type="text" 
+                id="chakorabot-input" 
+                placeholder="Type your message..." 
+                onkeypress="handleEnter(event)"
+                oninput="handleStudentTyping()"
+            />
+            <button id="chakorabot-send" onclick="sendMessage()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="white">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ==================== CHATBOT JAVASCRIPT ====================
+    
+    let chatbotOpen = false;
+    let conversationId = null;
+    let userId = null;
+    let studentTypingTimeout = null;
+
+    function handleStudentTyping() {
+        if (!conversationId) return;
+        fetch('/api/chatbot/typing', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                conversation_id: conversationId,
+                typing_status: 'student',
+                name: 'Student'
+            })
+        });
+
+        clearTimeout(studentTypingTimeout);
+        studentTypingTimeout = setTimeout(() => {
+            fetch('/api/chatbot/typing', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    conversation_id: conversationId,
+                    typing_status: 'none',
+                    name: 'Student'
+                })
+            });
+        }, 3000);
+    }
+
+
+    // Initialize chatbot
+    document.addEventListener('DOMContentLoaded', function() {
+        // Set welcome message time
+        document.getElementById('welcome-time').textContent = getCurrentTime();
+        
+        // Get user ID from session if logged in
+        userId = getUserId();
+        
+        // Generate or retrieve conversation ID
+        conversationId = getConversationId();
+        
+        // Load chat history
+        loadChatHistory();
+    });
+
+    // Toggle chatbot window
+    function toggleChatbot() {
+        chatbotOpen = !chatbotOpen;
+        const window = document.getElementById('chakorabot-window');
+        const badge = document.getElementById('chakorabot-badge');
+        
+        if (chatbotOpen) {
+            window.classList.add('open');
+            badge.style.display = 'none';
+            scrollToBottom();
+        } else {
+            window.classList.remove('open');
+        }
+    }
+
+    // Send message
+    async function sendMessage() {
+        const input = document.getElementById('chakorabot-input');
+        const message = input.value.trim();
+        
+        if (!message) return;
+        
+        // Add user message to UI
+        addMessage(message, 'user');
+        
+        // Clear input
+        input.value = '';
+        
+        // Show typing indicator
+        showTyping();
+        
+        // Send to backend
+        try {
+            const response = await fetch('/api/chatbot/message', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: message,
+                    conversation_id: conversationId,
+                    user_id: userId
+                })
+            });
+            
+            const data = await response.json();
+            
+            // Hide typing indicator
+            hideTyping();
+            
+            if (data.success) {
+                // Add bot response to UI if non-empty
+                if (data.response && data.response.trim() !== '') {
+                    addMessage(data.response, 'bot');
+                }
+                
+                // Update conversation ID
+                if (data.conversation_id) {
+                    conversationId = data.conversation_id;
+                    saveConversationId(conversationId);
+                }
+            } else {
+                const fallbackError = 'Sorry, I encountered an error. Please try again.';
+                addMessage(data.response || data.message || fallbackError, 'bot');
+            }
+        } catch (error) {
+            console.error('Chatbot error:', error);
+            hideTyping();
+            addMessage('Sorry, I\'m having trouble connecting. Please try again later.', 'bot');
+        }
+    }
+
+    // Send quick message
+    function sendQuickMessage(message) {
+        document.getElementById('chakorabot-input').value = message;
+        sendMessage();
+    }
+
+    // Handle Enter key
+    function handleEnter(event) {
+        if (event.key === 'Enter') {
+            sendMessage();
+        }
+    }
+
+    // Request live support (emails Gayatri Alahari & Ganesh Neeli)
+    async function requestLiveSupport() {
+        const msg = "I would like to talk with a support agent.";
+        addMessage(msg, 'user');
+        showTyping('bot');
+        try {
+            const response = await fetch('/api/chatbot/connect_support', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: msg,
+                    conversation_id: conversationId,
+                    user_id: userId
+                })
+            });
+            const data = await response.json();
+            hideTyping();
+            if (data.success) {
+                addMessage(data.response, 'bot');
+            } else {
+                addMessage("I have notified our support team. A support person will join shortly!", 'bot');
+            }
+        } catch (e) {
+            hideTyping();
+            addMessage("I have notified our support team. A support person will join shortly!", 'bot');
+        }
+    }
+
+    // Add message to chat
+    function addMessage(text, sender, userName) {
+        const messagesContainer = document.getElementById('chakorabot-messages');
+        
+        const messageDiv = document.createElement('div');
+        const isAgent = (sender === 'agent' || sender === 'support');
+        const isUser = (sender === 'user');
+        
+        messageDiv.className = `chakorabot-message ${isUser ? 'user' : (isAgent ? 'agent' : 'bot')}`;
+        
+        const avatar = document.createElement('div');
+        avatar.className = 'chakorabot-message-avatar';
+        if (isUser) {
+            avatar.textContent = '👤';
+        } else if (isAgent) {
+            avatar.textContent = '🎧';
+            avatar.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+        } else {
+            avatar.textContent = '🤖';
+        }
+        
+        const contentWrapper = document.createElement('div');
+        
+        if (isAgent) {
+            const senderLabel = document.createElement('div');
+            senderLabel.style.fontSize = '0.75rem';
+            senderLabel.style.fontWeight = '700';
+            senderLabel.style.color = '#059669';
+            senderLabel.style.marginBottom = '2px';
+            senderLabel.textContent = 'Support Person';
+            contentWrapper.appendChild(senderLabel);
+        }
+
+
+        const content = document.createElement('div');
+        content.className = 'chakorabot-message-content';
+        if (isAgent) {
+            content.style.background = '#ecfdf5';
+            content.style.border = '1px solid #a7f3d0';
+            content.style.color = '#065f46';
+        }
+        content.textContent = text;
+        
+        const time = document.createElement('div');
+        time.className = 'chakorabot-message-time';
+        time.textContent = getCurrentTime();
+        
+        contentWrapper.appendChild(content);
+        contentWrapper.appendChild(time);
+        
+        messageDiv.appendChild(avatar);
+        messageDiv.appendChild(contentWrapper);
+        
+        messagesContainer.appendChild(messageDiv);
+        
+        scrollToBottom();
+    }
+
+    // Show typing indicator: 'bot' -> "Chakora is typing...", 'agent' -> "Support Person is typing..."
+    function showTyping(who = 'bot') {
+        const label = document.getElementById('typing-text-label');
+        if (label) {
+            if (who === 'agent' || who === 'support') {
+                label.textContent = "🎧 Support Person is typing...";
+                label.style.color = "#059669";
+            } else {
+                label.textContent = "🤖 Chakora is typing...";
+                label.style.color = "#4b5563";
+            }
+        }
+        document.getElementById('chakorabot-typing').classList.add('show');
+        scrollToBottom();
+    }
+
+    // Hide typing indicator
+    function hideTyping() {
+        document.getElementById('chakorabot-typing').classList.remove('show');
+    }
+
+    // Track processed messages to prevent duplicate rendering or wiping DOM
+    let processedMsgCount = 0;
+
+    function renderWidgetMessages(messages) {
+        if (!messages || messages.length === 0) return;
+        const messagesContainer = document.getElementById('chakorabot-messages');
+        messagesContainer.innerHTML = '';
+        
+        messages.forEach(msg => {
+            let sender = 'bot';
+            let userName = '';
+
+            if (msg.role === 'user') {
+                sender = 'user';
+            } else if (msg.role === 'agent' || msg.user_type === 'support' || msg.user_id === 'support_agent') {
+                sender = 'agent';
+                userName = 'Support Person';
+            } else {
+                sender = 'bot';
+            }
+
+            addMessage(msg.content, sender, userName);
+        });
+        processedMsgCount = messages.length;
+    }
+
+    // Live status & history polling for live support agent replies
+    async function pollChatUpdates() {
+        if (!chatbotOpen || !conversationId) return;
+        try {
+            // 1. Check typing status
+            const typingRes = await fetch(`/api/chatbot/typing_status?conversation_id=${conversationId}`);
+            const typingData = await typingRes.json();
+            if (typingData.success) {
+                if (typingData.typing_status === 'agent') {
+                    showTyping('agent');
+                } else if (typingData.typing_status === 'bot') {
+                    showTyping('bot');
+                } else {
+                    hideTyping();
+                }
+            }
+
+            // 2. Poll for new support agent messages
+            const histRes = await fetch(`/api/chatbot/history?conversation_id=${conversationId}`);
+            const histData = await histRes.json();
+            if (histData.success && histData.messages) {
+                const msgs = histData.messages;
+                if (msgs.length > processedMsgCount) {
+                    const newMsgs = msgs.slice(processedMsgCount);
+                    newMsgs.forEach(msg => {
+                        if (msg.role === 'agent' || msg.user_type === 'support' || msg.user_id === 'support_agent') {
+                            addMessage(msg.content, 'agent', 'Support Person');
+                        }
+                    });
+                    processedMsgCount = msgs.length;
+                }
+            }
+        } catch (e) {
+            // silent retry
+        }
+    }
+
+    setInterval(pollChatUpdates, 2000);
+
+
+    // Scroll to bottom
+    function scrollToBottom() {
+        const messagesContainer = document.getElementById('chakorabot-messages');
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    // Get current time
+    function getCurrentTime() {
+        const now = new Date();
+        return now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    }
+
+    // Get user ID (from session or cookie)
+    function getUserId() {
+        if (typeof currentUserId !== 'undefined') {
+            return currentUserId;
+        }
+        
+        let anonymousId = localStorage.getItem('chakorabot_user_id');
+        if (!anonymousId) {
+            anonymousId = 'anon_' + Math.random().toString(36).substring(7);
+            localStorage.setItem('chakorabot_user_id', anonymousId);
+        }
+        return anonymousId;
+    }
+
+    // Get conversation ID
+    function getConversationId() {
+        let convId = sessionStorage.getItem('chakorabot_conversation_id');
+        if (!convId) {
+            convId = 'conv_' + Date.now() + '_' + Math.random().toString(36).substring(7);
+            sessionStorage.setItem('chakorabot_conversation_id', convId);
+        }
+        return convId;
+    }
+
+    // Save conversation ID
+    function saveConversationId(id) {
+        sessionStorage.setItem('chakorabot_conversation_id', id);
+    }
+
+    // Load chat history once on init
+    let historyLoaded = false;
+    async function loadChatHistory() {
+        if (historyLoaded) return;
+        try {
+            const response = await fetch(`/api/chatbot/history?conversation_id=${conversationId}`);
+            const data = await response.json();
+            
+            if (data.success && data.messages && data.messages.length > 0) {
+                renderWidgetMessages(data.messages);
+                historyLoaded = true;
+            }
+        } catch (error) {
+            console.log('No chat history to load');
+        }
+    }
+
+
+</script>
