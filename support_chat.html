@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChakoraHub - Live Agent Support Console</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif; }
+        body { background: #f1f5f9; color: #0f172a; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* Top Header */
+        .console-header {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%);
+            color: white;
+            padding: 14px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            z-index: 10;
+        }
+
+        .header-brand { display: flex; align-items: center; gap: 14px; }
+        .header-logo {
+            width: 44px; height: 44px;
+            background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px; box-shadow: 0 4px 12px rgba(99,102,241,0.4);
+        }
+        .header-title h1 { font-size: 1.15rem; font-weight: 800; letter-spacing: -0.02em; }
+        .header-title p { font-size: 0.8rem; color: #94a3b8; font-weight: 500; }
+
+        .header-actions { display: flex; align-items: center; gap: 14px; }
+
+        .role-badge {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.15);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #e2e8f0;
+            display: flex; align-items: center; gap: 6px;
+        }
+
+        .end-convo-btn {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            border: none;
+            padding: 9px 18px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: flex; align-items: center; gap: 6px;
+            box-shadow: 0 4px 12px rgba(239,68,68,0.3);
+            transition: all 0.2s ease;
+        }
+        .end-convo-btn:hover { background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); transform: translateY(-1px); }
+
+        /* Main Workspace Grid */
+        .console-body {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            max-width: 1440px;
+            width: 100%;
+            margin: 0 auto;
+            gap: 20px;
+            padding: 20px;
+            height: calc(100vh - 72px);
+        }
+
+        /* Left Info Sidebar */
+        .sidebar-card {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+            overflow-y: auto;
+        }
+
+        .sidebar-section-title {
+            font-size: 0.75rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #64748b;
+            margin-bottom: 8px;
+            display: flex; align-items: center; gap: 6px;
+        }
+
+        .meta-box {
+            background: #f8fafc;
+            border: 1px solid #f1f5f9;
+            border-radius: 12px;
+            padding: 12px 14px;
+            font-size: 0.85rem;
+        }
+
+        .meta-row { display: flex; justify-content: space-between; margin-bottom: 6px; }
+        .meta-row:last-child { margin-bottom: 0; }
+        .meta-label { color: #64748b; font-weight: 500; }
+        .meta-val { color: #0f172a; font-weight: 700; word-break: break-all; }
+
+        .session-status-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 5px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 700;
+        }
+        .status-active { background: #dcfce7; color: #15803d; }
+        .status-ended { background: #fee2e2; color: #b91c1c; }
+
+        /* Categorized Quick Responses */
+        .canned-category { margin-bottom: 12px; }
+        .canned-category-title { font-size: 0.78rem; font-weight: 700; color: #475569; margin-bottom: 6px; }
+
+        .canned-chip {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 0.82rem;
+            color: #334155;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: left;
+            width: 100%;
+            margin-bottom: 6px;
+            line-height: 1.35;
+        }
+        .canned-chip:hover { background: #e0e7ff; border-color: #6366f1; color: #4338ca; }
+
+        /* Right Chat Area */
+        .chat-card {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+            overflow: hidden;
+        }
+
+        .chat-header-bar {
+            padding: 14px 20px;
+            background: #ffffff;
+            border-bottom: 1px solid #f1f5f9;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .student-profile { display: flex; align-items: center; gap: 10px; }
+        .student-avatar {
+            width: 36px; height: 36px; background: #e0e7ff; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; font-size: 18px; color: #4338ca;
+        }
+
+        .messages-container {
+            flex: 1;
+            padding: 20px 24px;
+            overflow-y: auto;
+            background: #f8fafc;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .msg-group { display: flex; flex-direction: column; max-width: 78%; }
+        .msg-group.user { align-self: flex-start; }
+        .msg-group.bot { align-self: flex-start; }
+        .msg-group.agent { align-self: flex-end; }
+
+        .msg-header { font-size: 0.75rem; font-weight: 700; margin-bottom: 4px; color: #64748b; }
+        .msg-group.agent .msg-header { text-align: right; color: #6366f1; }
+
+        .msg-bubble {
+            padding: 12px 18px;
+            border-radius: 16px;
+            font-size: 0.92rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.03);
+        }
+
+        .msg-group.user .msg-bubble { background: #ffffff; border: 1px solid #e2e8f0; color: #0f172a; border-top-left-radius: 4px; }
+        .msg-group.bot .msg-bubble { background: #f1f5f9; border: 1px solid #e2e8f0; color: #334155; border-top-left-radius: 4px; }
+        .msg-group.agent .msg-bubble { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white; border-top-right-radius: 4px; }
+
+        .msg-time { font-size: 0.7rem; color: #94a3b8; margin-top: 4px; font-weight: 500; }
+        .msg-group.agent .msg-time { text-align: right; }
+
+        /* Typing Status Bar */
+        .typing-status-bar {
+            padding: 8px 24px;
+            font-size: 0.83rem;
+            color: #6366f1;
+            font-weight: 600;
+            font-style: italic;
+            height: 32px;
+            background: #fff;
+            display: flex; align-items: center; gap: 6px;
+        }
+
+        /* Input Controls */
+        .input-panel {
+            padding: 16px 20px;
+            background: white;
+            border-top: 1px solid #f1f5f9;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .reply-textarea {
+            flex: 1;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 12px 16px;
+            font-size: 0.92rem;
+            outline: none;
+            resize: none;
+            height: 52px;
+            transition: border-color 0.2s ease;
+        }
+
+        .reply-textarea:focus { border-color: #6366f1; }
+
+        .send-reply-btn {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(79,70,229,0.3);
+            transition: all 0.2s ease;
+            height: 52px;
+        }
+        .send-reply-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(79,70,229,0.4); }
+        .send-reply-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        /* In-Website Custom Modal Dialog */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(6px);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-card {
+            background: white;
+            border-radius: 20px;
+            width: 450px;
+            padding: 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+            border: 1px solid #e2e8f0;
+            animation: modalPop 0.25s ease-out;
+        }
+
+        @keyframes modalPop {
+            0% { transform: scale(0.9); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .modal-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+        .modal-icon { width: 44px; height: 44px; background: #fee2e2; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+        .modal-header h3 { font-size: 1.15rem; font-weight: 800; color: #0f172a; }
+        .modal-body { font-size: 0.92rem; color: #475569; line-height: 1.5; margin-bottom: 24px; }
+
+        .modal-actions { display: flex; justify-content: flex-end; gap: 12px; }
+        .modal-btn { padding: 11px 22px; border-radius: 10px; font-weight: 700; font-size: 0.88rem; cursor: pointer; border: none; transition: all 0.2s ease; }
+        .cancel-btn { background: #f1f5f9; color: #475569; }
+        .cancel-btn:hover { background: #e2e8f0; }
+        .confirm-btn { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; box-shadow: 0 4px 12px rgba(239,68,68,0.3); }
+        .confirm-btn:hover { background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); }
+    </style>
+</head>
+<body>
+
+    <!-- Top Header -->
+    <div class="console-header">
+        <div class="header-brand">
+            <div class="header-logo">🎧</div>
+            <div class="header-title">
+                <h1>ChakoraHub Live Agent Console</h1>
+                <p>Real-time Student Chat Support Workspace</p>
+            </div>
+        </div>
+        <div class="header-actions">
+            <div class="role-badge">
+                <span>👤 Role:</span>
+                <strong id="agent-role-display">Support Person</strong>
+            </div>
+            <button class="end-convo-btn" onclick="openEndModal()">
+                🛑 End Conversation
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Workspace Grid -->
+    <div class="console-body">
+        
+        <!-- Left Sidebar: Session Info & Categorized Quick Responses -->
+        <div class="sidebar-card">
+            <div>
+                <div class="sidebar-section-title">📌 Session Details</div>
+                <div class="meta-box">
+                    <div class="meta-row">
+                        <span class="meta-label">Session ID:</span>
+                        <span class="meta-val" id="meta-conv-id">Loading...</span>
+                    </div>
+                    <div class="meta-row" style="margin-top: 8px;">
+                        <span class="meta-label">Status:</span>
+                        <span id="meta-status-badge" class="session-status-badge status-active">🟢 Live Active</span>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div class="sidebar-section-title">⚡ Quick Responses (Click to Send)</div>
+
+                <!-- Category 1: Courses & Syllabus -->
+                <div class="canned-category">
+                    <div class="canned-category-title">🎓 Courses & Training</div>
+                    <button class="canned-chip" onclick="sendCanned('We offer Data Engineering, Python & Web Dev, Cloud & DevOps, Machine Learning, and QA Testing courses!')">
+                        ⚡ "We offer Data Engineering, Python, Cloud & ML courses!"
+                    </button>
+                    <button class="canned-chip" onclick="sendCanned('Our Data Engineering program covers Informatica IDMC/PowerCenter, Snowflake, PySpark, SQL & Data Warehousing.')">
+                        ⚡ "Data Engineering: Informatica, Snowflake & PySpark."
+                    </button>
+                </div>
+
+                <!-- Category 2: Registration & Enrollment -->
+                <div class="canned-category">
+                    <div class="canned-category-title">✍️ Registration & Enrollment</div>
+                    <button class="canned-chip" onclick="sendCanned('You can register online directly via the Register link in our navbar, or I can help enroll you right now!')">
+                        ⚡ "You can register online or I can help enroll you."
+                    </button>
+                    <button class="canned-chip" onclick="sendCanned('Please share your Full Name, Email, Phone Number, and desired course to start your registration.')">
+                        ⚡ "Please share Name, Email & Phone to register."
+                    </button>
+                </div>
+
+                <!-- Category 3: Internships -->
+                <div class="canned-category">
+                    <div class="canned-category-title">💼 Internship Programs</div>
+                    <button class="canned-chip" onclick="sendCanned('Our Internship Program provides real-world enterprise project experience, mentorship, and placement assistance.')">
+                        ⚡ "Our Internship includes live projects & placement support."
+                    </button>
+                </div>
+
+                <!-- Category 4: Payments & Billing -->
+                <div class="canned-category">
+                    <div class="canned-category-title">💳 Payment & Billing</div>
+                    <button class="canned-chip" onclick="sendCanned('Could you please share your payment transaction ID or registered email so I can check with our billing team?')">
+                        ⚡ "Could you please share your transaction ID or email?"
+                    </button>
+                    <button class="canned-chip" onclick="sendCanned('I have updated our accounts team regarding your payment query. Please give us a moment to verify.')">
+                        ⚡ "I have escalated your payment query to accounts."
+                    </button>
+                </div>
+
+                <!-- Category 5: General Support & Closing -->
+                <div class="canned-category">
+                    <div class="canned-category-title">🤝 General Support</div>
+                    <button class="canned-chip" onclick="sendCanned('Hi! Welcome to ChakoraHub Support. How can I help you today?')">
+                        ⚡ "Hi! Welcome to ChakoraHub Support."
+                    </button>
+                    <button class="canned-chip" onclick="sendCanned('Is there anything else regarding our courses or internships I can clarify for you today?')">
+                        ⚡ "Is there anything else I can clarify for you today?"
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Chat Panel -->
+        <div class="chat-card">
+            <div class="chat-header-bar">
+                <div class="student-profile">
+                    <div class="student-avatar">👤</div>
+                    <div>
+                        <strong style="font-size: 0.95rem; color: #0f172a;" id="student-name-header">Student Session</strong>
+                        <div style="font-size: 0.78rem; color: #64748b;">Live Support Handoff</div>
+                    </div>
+                </div>
+                <div id="typing-indicator-box" style="font-size: 0.82rem; font-weight: 600; color: #6366f1; display: none;">
+                    ✏️ Student is typing...
+                </div>
+            </div>
+
+            <div class="messages-container" id="messages-container">
+                <div style="text-align: center; color: #94a3b8; padding: 40px; font-size: 0.9rem;">
+                    Loading conversation messages...
+                </div>
+            </div>
+
+            <div class="typing-status-bar" id="typing-status-bar" style="display: none;">
+                ✏️ Student is typing...
+            </div>
+
+            <div class="input-panel">
+                <textarea 
+                    id="agent-input" 
+                    class="reply-textarea" 
+                    placeholder="Type your reply as Support Person..." 
+                    oninput="handleAgentTyping()" 
+                    onkeydown="handleKeyDown(event)"
+                ></textarea>
+                <button id="send-btn" class="send-reply-btn" onclick="sendAgentMessage()">Send Reply</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- In-Website Custom Modal Dialog -->
+    <div id="end-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="modal-icon">🛑</div>
+                <h3>End Live Support Session?</h3>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to end this live support conversation? A closing thank-you message will be delivered to the student and control will return to ChakoraBot AI.
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn cancel-btn" onclick="closeEndModal()">Cancel</button>
+                <button class="modal-btn confirm-btn" onclick="confirmEndConversation()">Yes, End Session</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const conversationId = urlParams.get('conversation_id') || 'conv_demo';
+        document.getElementById('meta-conv-id').textContent = conversationId;
+
+        let lastMsgCount = 0;
+        let isSessionEnded = false;
+        let agentTypingTimeout = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadMessages();
+            setInterval(loadMessages, 1500);
+            setInterval(checkTypingStatus, 1500);
+        });
+
+        // Load conversation messages
+        async function loadMessages() {
+            try {
+                const response = await fetch(`/api/chatbot/history?conversation_id=${conversationId}`);
+                const data = await response.json();
+                if (data.success && data.messages) {
+                    if (data.messages.length !== lastMsgCount) {
+                        renderMessages(data.messages);
+                        lastMsgCount = data.messages.length;
+                    }
+                }
+            } catch (err) {
+                console.error("Error loading chat history:", err);
+            }
+        }
+
+        // Render messages
+        function renderMessages(messages) {
+            const container = document.getElementById('messages-container');
+            container.innerHTML = '';
+
+            messages.forEach(msg => {
+                const group = document.createElement('div');
+                let roleClass = 'bot';
+                let senderName = 'ChakoraBot';
+
+                if (msg.role === 'user') {
+                    roleClass = 'user';
+                    senderName = msg.user_name || 'Student';
+                } else if (msg.role === 'agent' || msg.user_type === 'support' || msg.user_id === 'support_agent') {
+                    roleClass = 'agent';
+                    senderName = 'Support Person';
+                }
+
+                group.className = `msg-group ${roleClass}`;
+                
+                const header = document.createElement('div');
+                header.className = 'msg-header';
+                header.textContent = senderName;
+
+                const bubble = document.createElement('div');
+                bubble.className = 'msg-bubble';
+                bubble.textContent = msg.content;
+
+                const time = document.createElement('div');
+                time.className = 'msg-time';
+                time.textContent = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+
+                group.appendChild(header);
+                group.appendChild(bubble);
+                group.appendChild(time);
+
+                container.appendChild(group);
+            });
+
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // Check if student is typing
+        async function checkTypingStatus() {
+            if (isSessionEnded) return;
+            try {
+                const res = await fetch(`/api/chatbot/typing_status?conversation_id=${conversationId}`);
+                const data = await res.json();
+                const typingBar = document.getElementById('typing-status-bar');
+                const typingBox = document.getElementById('typing-indicator-box');
+
+                if (data.success && data.typing_status === 'student') {
+                    typingBar.style.display = 'flex';
+                    typingBox.style.display = 'block';
+                } else {
+                    typingBar.style.display = 'none';
+                    typingBox.style.display = 'none';
+                }
+            } catch (e) {
+                // silent
+            }
+        }
+
+        // Notify typing
+        function handleAgentTyping() {
+            if (isSessionEnded) return;
+            fetch('/api/chatbot/typing', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    conversation_id: conversationId,
+                    typing_status: 'agent',
+                    name: 'Support Person'
+                })
+            });
+
+            clearTimeout(agentTypingTimeout);
+            agentTypingTimeout = setTimeout(() => {
+                fetch('/api/chatbot/typing', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        conversation_id: conversationId,
+                        typing_status: 'none',
+                        name: 'Support Person'
+                    })
+                });
+            }, 3000);
+        }
+
+        function handleKeyDown(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendAgentMessage();
+            }
+        }
+
+        // Send agent reply
+        async function sendAgentMessage() {
+            if (isSessionEnded) return;
+            const input = document.getElementById('agent-input');
+            const message = input.value.trim();
+            if (!message) return;
+
+            input.value = '';
+
+            try {
+                await fetch('/api/chatbot/agent_message', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        conversation_id: conversationId,
+                        message: message,
+                        agent_name: 'Support Person'
+                    })
+                });
+
+                loadMessages();
+            } catch (err) {
+                console.error("Failed to send agent message:", err);
+            }
+        }
+
+        // Send quick canned response
+        function sendCanned(text) {
+            if (isSessionEnded) return;
+            document.getElementById('agent-input').value = text;
+            sendAgentMessage();
+        }
+
+        // Modal controls
+        function openEndModal() {
+            if (isSessionEnded) return;
+            document.getElementById('end-modal').style.display = 'flex';
+        }
+
+        function closeEndModal() {
+            document.getElementById('end-modal').style.display = 'none';
+        }
+
+        // Confirm end conversation
+        async function confirmEndConversation() {
+            closeEndModal();
+            try {
+                const res = await fetch('/api/chatbot/end_support', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ conversation_id: conversationId })
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    isSessionEnded = true;
+                    const badge = document.getElementById('meta-status-badge');
+                    badge.className = 'session-status-badge status-ended';
+                    badge.textContent = '🔴 Session Ended';
+
+                    document.getElementById('agent-input').disabled = true;
+                    document.getElementById('agent-input').placeholder = 'Conversation has been ended by Support Person.';
+                    document.getElementById('send-btn').disabled = true;
+
+                    loadMessages();
+                }
+            } catch (e) {
+                alert("Failed to end conversation. Please try again.");
+            }
+        }
+    </script>
+</body>
+</html>
