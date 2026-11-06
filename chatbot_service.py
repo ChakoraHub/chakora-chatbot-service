@@ -474,22 +474,30 @@ def health():
 def maintenance_status():
     return {"maintenance_mode": is_maintenance_enabled()}
 
-def verify_maintenance_token(request: Request):
+def verify_maintenance_token(request: Request) -> None:
+    """
+    Validate administrative maintenance authorization token.
+
+    Raises:
+        HTTPException: If token is missing or unauthorized (status 401).
+    """
     supplied_token = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
     if not MAINTENANCE_TOKEN or not secrets.compare_digest(supplied_token, MAINTENANCE_TOKEN):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-@app.post("/chatbot/maintenance/on")
-@app.post("/admin/maintenance/on")
+@app.post("/chatbot/maintenance/on", responses={401: {"description": "Unauthorized"}})
+@app.post("/admin/maintenance/on", responses={401: {"description": "Unauthorized"}})
 def enable_maintenance(request: Request):
+    """Enable maintenance mode."""
     verify_maintenance_token(request)
     MAINTENANCE_FLAG.parent.mkdir(parents=True, exist_ok=True)
     MAINTENANCE_FLAG.touch()
     return {"success": True, "maintenance_mode": True}
 
-@app.post("/chatbot/maintenance/off")
-@app.post("/admin/maintenance/off")
+@app.post("/chatbot/maintenance/off", responses={401: {"description": "Unauthorized"}})
+@app.post("/admin/maintenance/off", responses={401: {"description": "Unauthorized"}})
 def disable_maintenance(request: Request):
+    """Disable maintenance mode."""
     verify_maintenance_token(request)
     MAINTENANCE_FLAG.unlink(missing_ok=True)
     return {"success": True, "maintenance_mode": False}

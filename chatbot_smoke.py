@@ -203,3 +203,4 @@ def test_chatbot_widget_can_close(driver):
     time.sleep(1)
     is_open = "open" in (chat_window.get_attribute("class") or "")
     assert not is_open or not chat_window.is_displayed(), "Chatbot window did not close after clicking close button"
+
