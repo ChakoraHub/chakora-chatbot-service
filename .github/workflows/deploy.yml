@@ -82,8 +82,11 @@ jobs:
             echo "Working directory: $(pwd)"
 
             echo "Fetching latest main branch..."
-            git fetch origin main
-            git checkout -f -B main origin/main
+            if [ ! -e .git ]; then
+              git init
+            fi
+            git fetch https://github.com/ChakoraHub/chakora-chatbot-service.git main
+            git checkout -f -B main FETCH_HEAD
 
             echo "Installing Python dependencies..."
             if [ -d "chatbot-venv" ]; then
