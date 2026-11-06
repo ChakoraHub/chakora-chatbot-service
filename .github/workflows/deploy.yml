@@ -1,0 +1,231 @@
+name: Deploy Chatbot Service
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: chatbot-deploy
+  cancel-in-progress: false
+
+jobs:
+  # ============================================================================
+  # LEVEL 1: ENABLE MAINTENANCE MODE
+  # ============================================================================
+  enable-maintenance:
+    name: Enable maintenance mode
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Enable maintenance through Chatbot FastAPI
+        env:
+          CHATBOT_MAINTENANCE_ON_URL: ${{ secrets.CHATBOT_MAINTENANCE_ON_URL }}
+          MAINTENANCE_ON_URL: ${{ secrets.MAINTENANCE_ON_URL }}
+          MAINTENANCE_TOKEN: ${{ secrets.MAINTENANCE_TOKEN }}
+        run: |
+          set -e
+          TARGET_URL="${CHATBOT_MAINTENANCE_ON_URL:-$MAINTENANCE_ON_URL}"
+          TARGET_URL=$(echo "$TARGET_URL" | tr -d '\r\n"' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+          MAINTENANCE_TOKEN=$(echo "$MAINTENANCE_TOKEN" | tr -d '\r\n"' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+
+          echo "[maintenance:on] Starting maintenance enable request"
+          if [ -z "$TARGET_URL" ]; then
+            echo "[maintenance:on] Warning: Neither CHATBOT_MAINTENANCE_ON_URL nor MAINTENANCE_ON_URL is configured. Skipping API call."
+            exit 0
+          fi
+
+          if [ -n "$MAINTENANCE_TOKEN" ]; then
+            echo "[maintenance:on] MAINTENANCE_TOKEN is configured (length: ${#MAINTENANCE_TOKEN})"
+          else
+            echo "[maintenance:on] MAINTENANCE_TOKEN is empty"
+          fi
+
+          echo "[maintenance:on] Endpoint is configured: $TARGET_URL"
+          status=$(curl --silent --show-error --location --max-time 20 \
+            --output maintenance-on-response.txt \
+            --dump-header maintenance-on-headers.txt \
+            --write-out "%{http_code}" \
+            --header "Authorization: Bearer $MAINTENANCE_TOKEN" \
+            --request POST "$TARGET_URL" || true)
+
+          echo "[maintenance:on] HTTP status: $status"
+          echo "[maintenance:on] Response body:"
+          cat maintenance-on-response.txt || true
+          echo
+
+          if [ "$status" -ge 200 ] && [ "$status" -lt 300 ]; then
+            echo "[maintenance:on] Maintenance enabled successfully"
+          else
+            echo "[maintenance:on] Warning: Service endpoint returned $status prior to deployment. Proceeding with deployment to start/restart PM2..."
+          fi
+
+  # ============================================================================
+  # LEVEL 2: DEPLOY TO EC2
+  # ============================================================================
+  deploy:
+    name: Deploy Chatbot to EC2
+    runs-on: ubuntu-latest
+    needs: enable-maintenance
+
+    steps:
+      - name: SSH and deploy to EC2
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.AWS_HOST }}
+          username: ${{ secrets.AWS_USERNAME }}
+          key: ${{ secrets.AWS_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd "${{ secrets.APP_PATH }}"
+            echo "Working directory: $(pwd)"
+
+            echo "Fetching latest main branch..."
+            git fetch origin main
+            git checkout -f -B main origin/main
+
+            echo "Installing Python dependencies..."
+            if [ -d "chatbot-venv" ]; then
+              ./chatbot-venv/bin/pip install -r requirements.txt
+            elif [ -d "venv" ]; then
+              ./venv/bin/pip install -r requirements.txt
+            else
+              pip install -r requirements.txt
+            fi
+
+            echo "Restarting PM2 application..."
+            SERVICE_NAME="${{ secrets.PM2_SERVICE_NAME }}"
+            if [ -z "$SERVICE_NAME" ]; then
+              SERVICE_NAME="chatbot-service"
+            fi
+            pm2 restart "$SERVICE_NAME" || pm2 start chatbot_service.py --name "$SERVICE_NAME" --interpreter python3
+
+            echo "Deployment commands completed successfully."
+
+  # ============================================================================
+  # LEVEL 3: SELENIUM SMOKE TESTS
+  # ============================================================================
+  selenium-smoke-tests:
+    name: Selenium Smoke Tests
+    runs-on: ubuntu-latest
+    needs: deploy
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Chrome
+        id: setup-chrome
+        uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4 # v2.2.0
+        with:
+          chrome-version: "latest"
+          install-chromedriver: false
+
+      - name: Configure Chrome and driver environment
+        run: |
+          CHROME_PATH="${{ steps.setup-chrome.outputs.chrome-path }}"
+          if [ -n "$CHROME_PATH" ] && [ -f "$CHROME_PATH" ]; then
+            sudo ln -fs "$CHROME_PATH" /usr/bin/google-chrome || true
+            sudo ln -fs "$CHROME_PATH" /usr/bin/chrome || true
+          fi
+          # Remove mismatched chromedrivers so Selenium Manager automatically gets matching driver
+          sudo rm -rf /opt/hostedtoolcache/setup-chrome/chromedriver || true
+          sudo rm -f /usr/local/bin/chromedriver /usr/bin/chromedriver || true
+
+      - name: Install Selenium test dependencies
+        run: |
+          python -m pip install --only-binary :all: --upgrade pip==25.0.1
+          python -m pip install --only-binary :all: selenium==4.29.0 pytest==8.3.5 requests==2.32.3
+
+      - name: Wait for deployed Chatbot service
+        env:
+          CHATBOT_BASE_URL: https://www.chakorahub.com
+        run: |
+          for attempt in {1..12}; do
+            if curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' --max-time 10 "$CHATBOT_BASE_URL" > /dev/null; then
+              echo "Deployed website is responding."
+              exit 0
+            fi
+            echo "Website not ready (attempt $attempt/12)."
+            sleep 10
+          done
+          echo "Deployed website did not become ready."
+          exit 1
+
+      - name: Run Selenium smoke tests
+        env:
+          CHATBOT_BASE_URL: https://www.chakorahub.com
+          EXPECT_MAINTENANCE_NOTICE: "false"
+        run: |
+          pytest -v chatbot_smoke.py --junitxml=selenium-results.xml
+
+      - name: Upload Selenium results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selenium-results
+          path: selenium-results.xml
+          if-no-files-found: warn
+
+  # ============================================================================
+  # LEVEL 4: DISABLE MAINTENANCE MODE (Runs only if Selenium passes)
+  # ============================================================================
+  disable-maintenance:
+    name: Disable maintenance after passing tests
+    runs-on: ubuntu-latest
+    needs: selenium-smoke-tests
+    if: ${{ needs.selenium-smoke-tests.result == 'success' }}
+
+    steps:
+      - name: Disable maintenance through Chatbot FastAPI
+        env:
+          CHATBOT_MAINTENANCE_OFF_URL: ${{ secrets.CHATBOT_MAINTENANCE_OFF_URL }}
+          MAINTENANCE_OFF_URL: ${{ secrets.MAINTENANCE_OFF_URL }}
+          MAINTENANCE_TOKEN: ${{ secrets.MAINTENANCE_TOKEN }}
+        run: |
+          set -e
+          TARGET_URL="${CHATBOT_MAINTENANCE_OFF_URL:-$MAINTENANCE_OFF_URL}"
+          TARGET_URL=$(echo "$TARGET_URL" | tr -d '\r\n"' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+          MAINTENANCE_TOKEN=$(echo "$MAINTENANCE_TOKEN" | tr -d '\r\n"' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+
+          echo "[maintenance:off] Starting maintenance disable request"
+          if [ -z "$TARGET_URL" ]; then
+            echo "[maintenance:off] Warning: Neither CHATBOT_MAINTENANCE_OFF_URL nor MAINTENANCE_OFF_URL is configured. Skipping API call."
+            exit 0
+          fi
+
+          echo "[maintenance:off] Endpoint is configured: $TARGET_URL"
+          status=$(curl --silent --show-error --location-trusted --post301 --post302 --post303 --max-time 20 \
+            --output maintenance-off-response.txt \
+            --dump-header maintenance-off-headers.txt \
+            --write-out "%{http_code}" \
+            --header "Authorization: Bearer $MAINTENANCE_TOKEN" \
+            --request POST "$TARGET_URL" || true)
+
+          echo "[maintenance:off] HTTP status: $status"
+          echo "[maintenance:off] Response body:"
+          cat maintenance-off-response.txt || true
+          echo
+
+          if [ "$status" -ge 200 ] && [ "$status" -lt 300 ]; then
+            echo "[maintenance:off] Maintenance disabled successfully via API"
+          else
+            echo "[maintenance:off] Warning: API returned status $status. Proceeding to direct SSH flag removal."
+          fi
+
+      - name: SSH Direct Cleanup on EC2
+        if: always()
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.AWS_HOST }}
+          username: ${{ secrets.AWS_USERNAME }}
+          key: ${{ secrets.AWS_PRIVATE_KEY }}
+          script: |
+            rm -f /home/ec2-user/chatbot-maintenance.flag /tmp/chatbot-maintenance.flag "${{ secrets.APP_PATH }}/chatbot-maintenance.flag" || true
+            echo "Direct SSH maintenance flag cleanup completed."

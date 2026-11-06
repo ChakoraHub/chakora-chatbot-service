@@ -45,9 +45,11 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import secrets
+from pathlib import Path
 
 # ═══════════════════════════════════════════════════════════════
 # CONFIGURATION
@@ -77,6 +79,17 @@ HISTORY_LIMIT  = int(os.getenv("HISTORY_LIMIT",  "50"))   # max messages stored 
 # Identity
 BOT_NAME = "ChakoraBot"
 ORG_NAME = "ChakoraHub"
+
+# ═══════════════════════════════════════════════════════════════
+# MAINTENANCE MODE
+# ═══════════════════════════════════════════════════════════════
+MAINTENANCE_FLAG = Path(
+    os.getenv("MAINTENANCE_FLAG", "/home/ec2-user/chatbot-maintenance.flag")
+)
+MAINTENANCE_TOKEN = os.getenv("MAINTENANCE_TOKEN")
+
+def is_maintenance_enabled() -> bool:
+    return MAINTENANCE_FLAG.exists()
 
 # ═══════════════════════════════════════════════════════════════
 # RAG HEALTH CACHE
@@ -453,6 +466,34 @@ def generate_conversation_id() -> str:
 # API ENDPOINTS
 # ═══════════════════════════════════════════════════════════════
 
+@app.get("/health")
+def health():
+    return {"status": "healthy"}
+
+@app.get("/chatbot/maintenance/status")
+def maintenance_status():
+    return {"maintenance_mode": is_maintenance_enabled()}
+
+def verify_maintenance_token(request: Request):
+    supplied_token = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+    if not MAINTENANCE_TOKEN or not secrets.compare_digest(supplied_token, MAINTENANCE_TOKEN):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+@app.post("/chatbot/maintenance/on")
+@app.post("/admin/maintenance/on")
+def enable_maintenance(request: Request):
+    verify_maintenance_token(request)
+    MAINTENANCE_FLAG.parent.mkdir(parents=True, exist_ok=True)
+    MAINTENANCE_FLAG.touch()
+    return {"success": True, "maintenance_mode": True}
+
+@app.post("/chatbot/maintenance/off")
+@app.post("/admin/maintenance/off")
+def disable_maintenance(request: Request):
+    verify_maintenance_token(request)
+    MAINTENANCE_FLAG.unlink(missing_ok=True)
+    return {"success": True, "maintenance_mode": False}
+
 @app.get("/")
 def root():
     rag_up = _is_rag_up()
@@ -480,23 +521,15 @@ def root():
 async def handle_message(chat: ChatMessage):
     """
     Full chatbot pipeline with automatic RAG ↔ LLM-only failover:
-
-    RAG service UP:
-      1. Persist user message
-      2. retrieve_context()  → hybrid search + BGE-Reranker
-      3. build conversation context (sliding window)
-      4. call_llm(rag_context=<chunks>)  → Llama-3 via Ollama
-      5. Persist AI response
-      6. Return response + source filenames
-
-    RAG service DOWN:
-      1. Persist user message
-      2. Skip retrieval (rag_context = "")
-      3. build conversation context
-      4. call_llm(rag_available=False)   → Llama-3 via Ollama, fallback system prompt
-      5. Persist AI response
-      6. Return response with rag_used=False so the client can show a notice
     """
+    if is_maintenance_enabled():
+        return ChatResponse(
+            response="ChakoraBot is currently undergoing scheduled maintenance. Please check back shortly!",
+            sources=[],
+            conversation_id=chat.conversation_id or "maint",
+            rag_used=False
+        )
+
     try:
         conv_id = chat.conversation_id or generate_conversation_id()
 
